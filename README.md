@@ -9,6 +9,25 @@ prequirúrgica inicial en cirugía plástica estética corporal
 
 ---
 
+## Inicio rápido
+
+```bash
+git clone https://github.com/PaulinaPalmeyro/SistemaExpertoCirujano.git
+cd sistema_experto_cirugia
+
+# Interfaz gráfica (recomendada)
+pip install -r requirements.txt
+streamlit run app.py
+
+# Interfaz por consola
+python main.py
+
+# Casos de prueba
+python -m tests.test_casos
+```
+
+---
+
 ## Estructura del proyecto
 
 ```
@@ -33,64 +52,6 @@ sistema_experto_cirugia/
     ├── casos_prueba.py          # 6 casos definidos en la consigna
     └── test_casos.py            # Runner que verifica los 6 casos
 ```
-
----
-
-## Instalación
-
-El sistema usa **únicamente la librería estándar de Python**.
-La única dependencia opcional es **Streamlit** para la interfaz gráfica.
-
-Requisitos:
-
-- Python 3.9 o superior.
-
-Instalación opcional de Streamlit:
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
-## Cómo ejecutar
-
-### Opción 1: Interfaz gráfica (recomendada)
-
-```bash
-cd sistema_experto_cirugia
-streamlit run app.py
-```
-
-Streamlit abrirá una página web con un formulario dividido en secciones
-(datos generales, antropométricos, evaluación corporal, estado clínico y
-hábitos, antecedentes y expectativas). Al presionar **Evaluar paciente**
-se muestra el resultado completo con colores:
-
-- 🟢 verde: factores favorables.
-- 🟡 amarillo: factores de alerta.
-- 🔴 rojo: condiciones críticas / clasificaciones desfavorables.
-- 🔵 azul / neutro: datos calculados.
-
-### Opción 2: Interfaz por consola
-
-```bash
-cd sistema_experto_cirugia
-python main.py
-```
-
-El programa pregunta cada campo, valida la entrada y al final imprime
-clasificación, riesgo, adecuación, conductas sugeridas, factores
-favorables, alertas y reglas activadas.
-
-### Opción 3: Casos de prueba
-
-```bash
-cd sistema_experto_cirugia
-python -m tests.test_casos
-```
-
-Ejecuta los 6 casos descritos en la consigna y reporta cuáles pasan.
 
 ---
 
