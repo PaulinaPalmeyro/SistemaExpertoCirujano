@@ -1,0 +1,6 @@
+# El sistema experto solo usa librería estándar de Python.
+# La única dependencia opcional es Streamlit, usada para la interfaz gráfica.
+# Si solo se va a usar la interfaz de consola (main.py) o los tests, no es
+# necesario instalar nada.
+
+streamlit>=1.30
