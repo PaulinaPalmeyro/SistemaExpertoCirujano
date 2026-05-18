@@ -43,6 +43,19 @@ from .modelos import (
 from .subsistema_explicacion import SubsistemaExplicacion
 
 
+def _orden_codigo_regla(regla: Dict) -> tuple:
+    """Orden estable R1..R34, R33B, etc."""
+    codigo = regla["codigo"]
+    numeros = ""
+    for caracter in codigo[1:]:
+        if caracter.isdigit():
+            numeros += caracter
+        else:
+            break
+    sufijo = codigo[1 + len(numeros):]
+    return (int(numeros) if numeros else 0, sufijo)
+
+
 class MotorInferencias:
     """Motor de Inferencias con encadenamiento hacia adelante."""
 
@@ -160,7 +173,7 @@ class MotorInferencias:
         """
         candidatas = self.base.reglas_por_prioridad(prioridad)
         # Orden estable por código (R1, R2, ...)
-        candidatas = sorted(candidatas, key=lambda r: int(r["codigo"][1:]))
+        candidatas = sorted(candidatas, key=_orden_codigo_regla)
 
         aplicables: List[Dict] = []
         for regla in candidatas:

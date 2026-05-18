@@ -165,10 +165,10 @@ CASOS.append({
         expectativas="realistas",
     ),
     "esperado": {
-        "clasificacion_preliminar": None,
-        "nivel_riesgo": None,
+        "clasificacion_preliminar": "no recomendado por el momento",
+        "nivel_riesgo": "bajo",
         "adecuacion_procedimiento": "no adecuado",
-        "conductas_clave": ["Redefinir técnica"],
+        "conductas_clave": ["Redefinir"],
     },
 })
 

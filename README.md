@@ -22,9 +22,14 @@ streamlit run app.py
 # Interfaz por consola
 python main.py
 
-# Casos de prueba
+# Casos de prueba (consigna, 6 casos)
 python -m tests.test_casos
+
+# Métricas e informe (benchmark ~45 casos + informe automático)
+python -m tests.evaluar_metricas
 ```
+
+El informe se genera en `informes/INFORME_METRICAS.md` (tasa de acierto, tiempo de inferencia, % incertidumbre).
 
 ---
 
@@ -47,9 +52,15 @@ sistema_experto_cirugia/
 │   ├── motor_inferencias.py     # Encadenamiento hacia adelante
 │   └── subsistema_explicacion.py# Explicación en lenguaje natural
 │
+├── informes/
+│   └── INFORME_METRICAS.md      # Informe generado (métricas de evaluación)
+│
 └── tests/
     ├── __init__.py
     ├── casos_prueba.py          # 6 casos definidos en la consigna
+    ├── casos_benchmark.py       # Banco ampliado con gold standard
+    ├── metricas.py              # Cálculo de métricas
+    ├── evaluar_metricas.py      # Genera el informe
     └── test_casos.py            # Runner que verifica los 6 casos
 ```
 
@@ -179,10 +190,30 @@ verifica:
 | 2. Abdominoplastía + exceso de piel + tabaco dispuesto a dejar  | optimización previa / riesgo moderado / adecuado    |
 | 3. Abdominoplastía + fluctuación > 10 %                         | postergar / riesgo alto / parcialmente adecuado     |
 | 4. Liposucción con expectativas irreales                        | no recomendado por el momento                       |
-| 5. Liposucción con grasa visceral sospechada                    | procedimiento no adecuado / redefinir técnica       |
+| 5. Liposucción con grasa visceral sospechada                    | no recomendado / no adecuado (R33B coherencia)      |
 | 6. Combinada + enfermedad no controlada                         | postergar / control clínico previo                  |
 
 Salida esperada: `Casos aprobados: 6 / 6`.
+
+---
+
+## Evaluación de métricas
+
+Comando:
+
+```bash
+python -m tests.evaluar_metricas
+```
+
+Métricas medidas sobre el banco en `tests/casos_benchmark.py` (~45 perfiles con resultado esperado predefinido):
+
+| Métrica | Descripción |
+|---------|-------------|
+| Tasa de acierto del diagnóstico | % de casos donde clasificación, riesgo y adecuación coinciden con el gold standard |
+| Tiempo promedio de inferencia | ms por llamada a `MotorInferencias.evaluar()` |
+| % derivados a incertidumbre | % con salida «información insuficiente» (sin recomendación concluyente) |
+
+El informe detallado queda en `informes/INFORME_METRICAS.md` (metodología, resultados por grupo y discrepancias).
 
 ---
 

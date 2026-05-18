@@ -127,8 +127,67 @@ def _en_lista(valor, opcion) -> bool:
     return valor == opcion
 
 
+# Umbrales regla difusa R33B (coherencia procedimiento–clasificación)
+_UMBRAL_MU_NO_ADECUADO = 0.7
+_UMBRAL_MU_INCOMPATIBILIDAD = 0.6
+
+
+def _grado_no_adecuado(memoria) -> float:
+    """Grado difuso de «no adecuado» desde activaciones o valor defuzzificado."""
+    activacion = memoria.activaciones_adecuacion.get("no adecuado", 0.0)
+    if activacion > 0:
+        return activacion
+    valor = _c(memoria, "adecuacion_valor")
+    if valor is None:
+        return 0.0
+    for conjunto in CONJUNTOS_ADECUACION:
+        if conjunto.etiqueta == "no adecuado":
+            return conjunto.grado(valor)
+    return 0.0
+
+
+def _grado_incompatibilidad_procedimiento(memoria) -> float:
+    """
+    Grado de incompatibilidad anatómica entre procedimiento deseado y hallazgos.
+    1.0 = incompatibilidad clara (p. ej. liposucción + grasa visceral).
+    """
+    condicion = _e(memoria, "condicion_corporal_observada", [])
+    procedimiento = _e(memoria, "procedimiento_deseado")
+    grado = 0.0
+
+    if procedimiento == "liposucción" and "grasa visceral sospechada" in condicion:
+        grado = max(grado, 1.0)
+    if (
+        procedimiento == "liposucción"
+        and "exceso de piel" in condicion
+        and "grasa localizada" not in condicion
+        and "grasa visceral sospechada" not in condicion
+    ):
+        grado = max(grado, 0.75)
+
+    return grado
+
+
+def _coherencia_procedimiento_alta(memoria) -> bool:
+    """True si aplica la regla difusa de coherencia (R33B)."""
+    if _c(memoria, "adecuacion_categoria") != "no adecuado":
+        return False
+    mu_no_adecuado = _grado_no_adecuado(memoria)
+    mu_incompatibilidad = _grado_incompatibilidad_procedimiento(memoria)
+    grado_activacion = min(mu_no_adecuado, mu_incompatibilidad)
+
+    memoria.fijar("sistema", "coherencia_mu_no_adecuado", round(mu_no_adecuado, 3))
+    memoria.fijar("sistema", "coherencia_mu_incompatibilidad", round(mu_incompatibilidad, 3))
+    memoria.fijar("sistema", "coherencia_grado_activacion", round(grado_activacion, 3))
+
+    return (
+        mu_no_adecuado >= _UMBRAL_MU_NO_ADECUADO
+        and mu_incompatibilidad >= _UMBRAL_MU_INCOMPATIBILIDAD
+    )
+
+
 # ===========================================================================
-# Definición de reglas (R1..R34)
+# Definición de reglas (R1..R34, R33B)
 # Cada regla es un dict consumible por el Motor de Inferencias.
 # ===========================================================================
 
@@ -579,10 +638,43 @@ _registrar("R33", "No recomendado por el momento", 6, _r33_cond, _r33_acc,
            "Clasifica como NO RECOMENDADO POR EL MOMENTO")
 
 
+def _r33b_cond(m):
+    if m.hay_clasificacion_fijada():
+        return False
+    return _coherencia_procedimiento_alta(m)
+
+
+def _r33b_acc(m):
+    if _c(m, "nivel_riesgo_categoria") == "alto":
+        m.fijar_clasificacion("postergar", prioridad=6, origen="R33B")
+    else:
+        m.fijar_clasificacion("no recomendado por el momento", prioridad=6, origen="R33B")
+    m.agregar_conducta(
+        "Redefinir procedimiento: incompatibilidad anatómica con la técnica solicitada"
+    )
+    m.agregar_alerta("Incompatibilidad procedimiento–condición corporal (coherencia difusa R33B)")
+
+
+_registrar(
+    "R33B",
+    "Coherencia difusa procedimiento–clasificación",
+    6,
+    _r33b_cond,
+    _r33b_acc,
+    "Si no adecuado ∧ incompatibilidad alta → no recomendado/postergar (no optimización previa)",
+)
+
+
 def _r34_cond(m):
     if m.hay_clasificacion_fijada():
         return False
-    return _c(m, "adecuacion_categoria") in ("no adecuado", "parcialmente adecuado")
+    if _c(m, "adecuacion_categoria") not in ("no adecuado", "parcialmente adecuado"):
+        return False
+    if _coherencia_procedimiento_alta(m):
+        return False
+    return True
+
+
 def _r34_acc(m):
     if _c(m, "nivel_riesgo_categoria") == "alto":
         m.fijar_clasificacion("postergar", prioridad=6, origen="R34")
@@ -602,7 +694,7 @@ class BaseConocimientos:
     Encapsula los recursos de conocimiento del sistema:
         - variables lingüísticas,
         - conjuntos difusos de salida,
-        - reglas R1..R34.
+        - reglas R1..R34 y R33B (coherencia difusa).
     """
 
     def __init__(self):
