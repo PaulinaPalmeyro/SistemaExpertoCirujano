@@ -24,7 +24,6 @@ EMBARAZO_OPCIONES = [
     "no",
     "embarazo actual",
     "embarazo futuro cercano",
-    "no sabe",
 ]
 
 # Opciones mostradas en formularios (sin "no aplica"; se asigna automáticamente)
@@ -32,7 +31,6 @@ EMBARAZO_OPCIONES_FORMULARIO = [
     "no",
     "embarazo actual",
     "embarazo futuro cercano",
-    "no sabe",
 ]
 
 PROCEDIMIENTO_OPCIONES = ["abdominoplastía", "liposucción", "ambos"]
@@ -68,12 +66,15 @@ SI_NO_NA_OPCIONES = ["sí", "no", "no aplica"]
 # Solo sí/no en formularios; "no aplica" se asigna automáticamente cuando corresponde
 DISPUESTO_HABITOS_OPCIONES = ["sí", "no"]
 
-
-def resolver_embarazo(sexo_biologico: Optional[str], embarazo_seleccionado: Optional[str]) -> str:
-    """Asigna 'no aplica' si el sexo biológico no es femenino."""
+def resolver_embarazo(sexo_biologico: Optional[str], embarazo_seleccionado: Optional[str]) -> Optional[str]:
+    """Resuelve embarazo según sexo; None si falta información."""
+    if not sexo_biologico:
+        return None
     if sexo_biologico != "femenino":
         return "no aplica"
-    return embarazo_seleccionado or "no"
+    if not embarazo_seleccionado:
+        return None
+    return embarazo_seleccionado
 
 
 OPCION_NINGUNO = "ninguno"
@@ -91,11 +92,17 @@ def resolver_dispuesto_habitos(
     fuma: Optional[str],
     consumo_problematico: Optional[str],
     dispuesto_seleccionado: Optional[str],
-) -> str:
-    """Asigna 'no aplica' si no fuma ni tiene consumo problemático."""
+) -> Optional[str]:
+    """Asigna 'no aplica' si no fuma ni tiene consumo; None si falta información."""
+    if not fuma:
+        return None
+    if not consumo_problematico:
+        return None
     if fuma == "no" and consumo_problematico == "no":
         return "no aplica"
-    return dispuesto_seleccionado or "no"
+    if not dispuesto_seleccionado:
+        return None
+    return dispuesto_seleccionado
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +206,16 @@ CAMPOS_OBLIGATORIOS = [
 ]
 
 
+def _valor_vacio(valor: object) -> bool:
+    if valor is None:
+        return True
+    if isinstance(valor, str) and valor == "":
+        return True
+    if isinstance(valor, list) and len(valor) == 0:
+        return True
+    return False
+
+
 def validar_informacion_completa(datos: DatosPaciente) -> (bool, List[str]):
     """
     Verifica que los campos obligatorios estén presentes.
@@ -206,8 +223,36 @@ def validar_informacion_completa(datos: DatosPaciente) -> (bool, List[str]):
     """
     faltantes: List[str] = []
     d = datos.como_diccionario()
+    numericos_positivos = {"edad", "peso_actual", "altura", "peso_hace_6_meses"}
+
     for campo in CAMPOS_OBLIGATORIOS:
         valor = d.get(campo)
-        if valor is None or valor == "" or (isinstance(valor, (int, float)) and valor <= 0 and campo in {"edad", "peso_actual", "altura", "peso_hace_6_meses"}):
+
+        if campo == "embarazo_actual_o_futuro_cercano":
+            if datos.sexo_biologico == "femenino" and _valor_vacio(valor):
+                faltantes.append(campo)
+            continue
+
+        if campo == "dispuesto_a_dejar_habitos_riesgo":
+            if _valor_vacio(datos.fuma) or _valor_vacio(datos.consumo_problematico_sustancias):
+                continue
+            if datos.fuma == "no" and datos.consumo_problematico_sustancias == "no":
+                continue
+            if _valor_vacio(valor):
+                faltantes.append(campo)
+            continue
+
+        if campo in numericos_positivos:
+            if valor is None or not isinstance(valor, (int, float)) or valor <= 0:
+                faltantes.append(campo)
+            continue
+
+        if _valor_vacio(valor):
             faltantes.append(campo)
+
+    if not datos.condicion_corporal_observada:
+        faltantes.append("condicion_corporal_observada")
+    if not datos.factores_riesgo_especificos:
+        faltantes.append("factores_riesgo_especificos")
+
     return (len(faltantes) == 0, faltantes)

@@ -291,8 +291,6 @@ class MotorInferencias:
             "categoria_imc": memoria.obtener("sistema", "categoria_imc"),
             "fluctuacion_peso_calculada": memoria.obtener("sistema", "fluctuacion_peso_calculada"),
             "estabilidad_peso": memoria.obtener("sistema", "estabilidad_peso"),
-            "cicatrizacion_categoria": memoria.obtener("sistema", "cicatrizacion_categoria"),
-            "expectativas_categoria": memoria.obtener("sistema", "expectativas_categoria"),
         }
 
         # Asegurar conducta principal coherente con la clasificación final

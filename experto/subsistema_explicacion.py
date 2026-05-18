@@ -84,9 +84,7 @@ class SubsistemaExplicacion:
             f"({datos_calculados.get('categoria_imc')}). "
             f"Fluctuación de peso en los últimos 6 meses: "
             f"{datos_calculados.get('fluctuacion_peso_calculada')}% "
-            f"({datos_calculados.get('estabilidad_peso')}). "
-            f"Cicatrización: {datos_calculados.get('cicatrizacion_categoria')}. "
-            f"Expectativas: {datos_calculados.get('expectativas_categoria')}."
+            f"({datos_calculados.get('estabilidad_peso')})."
         )
 
         if memoria.factores_favorables:

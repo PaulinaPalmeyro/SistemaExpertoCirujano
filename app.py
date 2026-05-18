@@ -39,6 +39,56 @@ from experto.modelos import (
 from experto.motor_inferencias import MotorInferencias
 
 
+RESULTADO_KEY = "resultado_evaluacion"
+LIMPIAR_FLAG = "limpiar_formulario"
+FORM_VERSION_KEY = "form_version"
+
+
+# ---------------------------------------------------------------------------
+# Limpieza del formulario / nuevo paciente
+# ---------------------------------------------------------------------------
+
+def _form_key(nombre: str) -> str:
+    """Clave única por versión del formulario; al limpiar se incrementa la versión."""
+    version = st.session_state.get(FORM_VERSION_KEY, 0)
+    return f"form_{version}_{nombre}"
+
+
+def _estado_seleccion_multiple(
+    base_key: str,
+    opciones: list[str],
+    valores_defecto: list[str],
+) -> dict[str, object]:
+    seleccion = [o for o in valores_defecto if o in opciones]
+    estado: dict[str, object] = {f"{base_key}_seleccion": seleccion}
+    for opcion in opciones:
+        estado[f"{base_key}_{opcion}"] = opcion in seleccion
+    return estado
+
+
+def aplicar_valores_defecto_formulario() -> None:
+    """Recrea el formulario totalmente vacío (nueva versión de widgets)."""
+    st.session_state.pop(RESULTADO_KEY, None)
+    st.session_state[FORM_VERSION_KEY] = st.session_state.get(FORM_VERSION_KEY, 0) + 1
+
+
+def _opcion_o_none(valor: str | None) -> str | None:
+    if valor is None:
+        return None
+    return valor
+
+
+def _numero_o_none(valor: float | int | None) -> float | None:
+    if valor is None:
+        return None
+    return float(valor)
+
+
+def solicitar_limpieza_formulario() -> None:
+    """Marca un reinicio para aplicarlo al inicio del siguiente ciclo de Streamlit."""
+    st.session_state[LIMPIAR_FLAG] = True
+
+
 # ---------------------------------------------------------------------------
 # Configuración de la página
 # ---------------------------------------------------------------------------
@@ -60,12 +110,12 @@ def encabezado():
     )
 
 
-def _radio_si_no(etiqueta: str, valor_defecto: str = "no", *, key: str) -> str:
-    """Opciones sí/no como botones de radio, no desplegable."""
+def _radio_si_no(etiqueta: str, *, key: str) -> str | None:
+    """Sí/no sin selección por defecto."""
     return st.radio(
         etiqueta,
         SI_NO_OPCIONES,
-        index=SI_NO_OPCIONES.index(valor_defecto),
+        index=None,
         horizontal=True,
         key=key,
     )
@@ -85,9 +135,9 @@ def _seleccion_multiple(
     """
     estado_key = f"{key}_seleccion"
     if estado_key not in st.session_state:
-        st.session_state[estado_key] = [
-            o for o in valores_defecto if o in opciones
-        ]
+        st.session_state.update(
+            _estado_seleccion_multiple(key, opciones, valores_defecto),
+        )
 
     st.markdown(f"**{etiqueta}**")
     if opcion_exclusiva and opcion_exclusiva in opciones:
@@ -137,36 +187,48 @@ def construir_formulario() -> DatosPaciente | None:
     col_a, col_b, col_c, col_d = st.columns(4)
     with col_a:
         edad = st.number_input(
-            "Edad (años cumplidos)", min_value=0, max_value=120, value=35, step=1,
+            "Edad (años cumplidos)",
+            min_value=0,
+            max_value=120,
+            value=None,
+            step=1,
             help="Edad del paciente en años cumplidos. Ej: 35.",
+            key=_form_key("paciente_edad"),
         )
     with col_b:
         sexo = st.radio(
             "Sexo biológico",
             SEXO_OPCIONES,
-            index=0,
+            index=None,
             horizontal=True,
             help="Sexo biológico registrado.",
-            key="sexo_biologico",
+            key=_form_key("sexo_biologico"),
         )
     with col_c:
         if sexo == "femenino":
             embarazo_ui = st.radio(
                 "Embarazo actual o futuro cercano",
                 EMBARAZO_OPCIONES_FORMULARIO,
-                index=0,
+                index=None,
                 horizontal=False,
                 help="Estado de embarazo actual o planificado a corto plazo.",
-                key="embarazo",
+                key=_form_key("embarazo"),
             )
+        elif not sexo:
+            st.markdown("**Embarazo actual o futuro cercano**")
+            st.caption("Seleccione primero el sexo biológico.")
+            embarazo_ui = None
         else:
             st.markdown("**Embarazo actual o futuro cercano**")
             st.caption("No aplica — asignado automáticamente.")
             embarazo_ui = None
     with col_d:
         procedimiento = st.selectbox(
-            "Procedimiento deseado", PROCEDIMIENTO_OPCIONES, index=0,
+            "Procedimiento deseado",
+            PROCEDIMIENTO_OPCIONES,
+            index=None,
             help="Procedimiento que el paciente desea: abdominoplastía, liposucción o ambos.",
+            key=_form_key("procedimiento_deseado"),
         )
 
     embarazo = resolver_embarazo(sexo, embarazo_ui)
@@ -176,21 +238,34 @@ def construir_formulario() -> DatosPaciente | None:
     col1, col2, col3 = st.columns(3)
     with col1:
         peso_actual = st.number_input(
-            "Peso actual (kg)", min_value=0.0, max_value=300.0,
-            value=70.0, step=0.5,
+            "Peso actual (kg)",
+            min_value=0.0,
+            max_value=300.0,
+            value=None,
+            step=0.5,
             help="Peso actual del paciente en kilogramos. Ej: 72.5",
+            key=_form_key("peso_actual"),
         )
     with col2:
         altura = st.number_input(
-            "Altura (metros)", min_value=0.0, max_value=2.5,
-            value=1.70, step=0.01, format="%.2f",
+            "Altura (metros)",
+            min_value=0.0,
+            max_value=2.5,
+            value=None,
+            step=0.01,
+            format="%.2f",
             help="Altura en metros. Ej: 1.68",
+            key=_form_key("altura"),
         )
     with col3:
         peso_6m = st.number_input(
-            "Peso hace 6 meses (kg)", min_value=0.0, max_value=300.0,
-            value=70.0, step=0.5,
+            "Peso hace 6 meses (kg)",
+            min_value=0.0,
+            max_value=300.0,
+            value=None,
+            step=0.5,
             help="Peso del paciente 6 meses atrás. Sirve para evaluar estabilidad.",
+            key=_form_key("peso_6m"),
         )
 
     # Sección 3: Evaluación corporal -------------------------------------
@@ -198,13 +273,15 @@ def construir_formulario() -> DatosPaciente | None:
     condicion = _seleccion_multiple(
         "Condición corporal observada (marque todas las que apliquen)",
         CONDICION_CORPORAL_OPCIONES,
-        ["grasa localizada"],
-        key="condicion_corporal",
+        [],
+        key=_form_key("condicion_corporal"),
     )
     cicatrizacion = st.selectbox(
         "Cicatrización (estimada por antecedentes / examen)",
-        CICATRIZACION_OPCIONES, index=2,
+        CICATRIZACION_OPCIONES,
+        index=None,
         help="Calidad estimada de cicatrización del paciente.",
+        key=_form_key("cicatrizacion"),
     )
 
     # Sección 4: Estado clínico y hábitos --------------------------------
@@ -212,21 +289,21 @@ def construir_formulario() -> DatosPaciente | None:
     factores = _seleccion_multiple(
         "Factores de riesgo específicos",
         FACTORES_RIESGO_OPCIONES,
-        ["ninguno"],
-        key="factores_riesgo",
+        [],
+        key=_form_key("factores_riesgo"),
     )
     col_e, col_f, col_g, col_h = st.columns(4)
     with col_e:
         enf = _radio_si_no(
             "Enfermedad no controlada",
-            key="enfermedad_no_controlada",
+            key=_form_key("enfermedad_no_controlada"),
         )
     with col_f:
-        fuma = _radio_si_no("Fuma actualmente", key="fuma")
+        fuma = _radio_si_no("Fuma actualmente", key=_form_key("fuma"))
     with col_g:
         consumo = _radio_si_no(
             "Consumo problemático de sustancias",
-            key="consumo_sustancias",
+            key=_form_key("consumo_sustancias"),
         )
     with col_h:
         aplica_habitos = fuma == "sí" or consumo == "sí"
@@ -234,11 +311,15 @@ def construir_formulario() -> DatosPaciente | None:
             dispuesto_ui = st.radio(
                 "Dispuesto a dejar hábitos de riesgo",
                 DISPUESTO_HABITOS_OPCIONES,
-                index=1,
+                index=None,
                 horizontal=True,
                 help="Compromiso de abandono de tabaco y/o sustancias.",
-                key="dispuesto_habitos",
+                key=_form_key("dispuesto_habitos"),
             )
+        elif not fuma or not consumo:
+            st.markdown("**Dispuesto a dejar hábitos de riesgo**")
+            st.caption("Indique primero tabaco y consumo de sustancias.")
+            dispuesto_ui = None
         else:
             st.markdown("**Dispuesto a dejar hábitos de riesgo**")
             st.caption("No aplica — asignado automáticamente.")
@@ -251,36 +332,57 @@ def construir_formulario() -> DatosPaciente | None:
     col_i, col_j = st.columns(2)
     with col_i:
         antecedentes = st.selectbox(
-            "Antecedentes quirúrgicos", ANTECEDENTES_OPCIONES, index=0,
+            "Antecedentes quirúrgicos",
+            ANTECEDENTES_OPCIONES,
+            index=None,
             help="Cirugías previas y su evolución.",
+            key=_form_key("antecedentes_quirurgicos"),
         )
     with col_j:
         expectativas = st.selectbox(
-            "Expectativas", EXPECTATIVAS_OPCIONES, index=0,
+            "Expectativas",
+            EXPECTATIVAS_OPCIONES,
+            index=None,
             help="Coherencia entre lo que el paciente espera y lo que la cirugía puede ofrecer.",
+            key=_form_key("expectativas"),
         )
 
-    if not st.button("🔎 Evaluar paciente", use_container_width=True, type="primary"):
-        st.stop()
+    col_evaluar, col_limpiar = st.columns([3, 1])
+    with col_evaluar:
+        evaluar = st.button(
+            "🔎 Evaluar paciente", use_container_width=True, type="primary",
+        )
+    with col_limpiar:
+        limpiar = st.button(
+            "🗑️ Nuevo paciente",
+            use_container_width=True,
+            help="Borra los datos del formulario y el último resultado para cargar otro paciente.",
+        )
+
+    if limpiar:
+        solicitar_limpieza_formulario()
+        st.rerun()
+
+    if not evaluar:
         return None
 
     return DatosPaciente(
-        edad=edad,
-        sexo_biologico=sexo,
+        edad=_numero_o_none(edad),
+        sexo_biologico=_opcion_o_none(sexo),
         embarazo_actual_o_futuro_cercano=embarazo,
-        procedimiento_deseado=procedimiento,
-        peso_actual=peso_actual,
-        altura=altura,
-        peso_hace_6_meses=peso_6m,
+        procedimiento_deseado=_opcion_o_none(procedimiento),
+        peso_actual=_numero_o_none(peso_actual),
+        altura=_numero_o_none(altura),
+        peso_hace_6_meses=_numero_o_none(peso_6m),
         condicion_corporal_observada=condicion,
-        cicatrizacion=cicatrizacion,
+        cicatrizacion=_opcion_o_none(cicatrizacion),
         factores_riesgo_especificos=factores,
-        enfermedad_no_controlada=enf,
-        fuma=fuma,
-        consumo_problematico_sustancias=consumo,
+        enfermedad_no_controlada=_opcion_o_none(enf),
+        fuma=_opcion_o_none(fuma),
+        consumo_problematico_sustancias=_opcion_o_none(consumo),
         dispuesto_a_dejar_habitos_riesgo=dispuesto,
-        antecedentes_quirurgicos=antecedentes,
-        expectativas=expectativas,
+        antecedentes_quirurgicos=_opcion_o_none(antecedentes),
+        expectativas=_opcion_o_none(expectativas),
     )
 
 
@@ -345,9 +447,7 @@ def mostrar_resultado(resultado: dict):
     st.info(
         f"IMC: **{dc.get('imc_calculado')}** ({dc.get('categoria_imc')}) — "
         f"Fluctuación peso: **{dc.get('fluctuacion_peso_calculada')}%** "
-        f"({dc.get('estabilidad_peso')}) — "
-        f"Cicatrización: **{dc.get('cicatrizacion_categoria')}** — "
-        f"Expectativas: **{dc.get('expectativas_categoria')}**."
+        f"({dc.get('estabilidad_peso')})."
     )
 
     # Factores
@@ -395,13 +495,16 @@ def mostrar_resultado(resultado: dict):
 # ---------------------------------------------------------------------------
 
 def main():
+    if st.session_state.pop(LIMPIAR_FLAG, False):
+        aplicar_valores_defecto_formulario()
+
     encabezado()
     datos = construir_formulario()
-    if datos is None:
-        return
-    motor = MotorInferencias()
-    resultado = motor.evaluar(datos)
-    mostrar_resultado(resultado)
+    if datos is not None:
+        motor = MotorInferencias()
+        st.session_state[RESULTADO_KEY] = motor.evaluar(datos)
+    if RESULTADO_KEY in st.session_state:
+        mostrar_resultado(st.session_state[RESULTADO_KEY])
 
 
 if __name__ == "__main__":
